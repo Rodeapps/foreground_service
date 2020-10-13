@@ -6,11 +6,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
-import android.os.PowerManager
+import android.os.*
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
@@ -27,6 +25,120 @@ import org.json.JSONObject
 import java.lang.ref.SoftReference
 
 class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService("org.thebus.ForegroundServicePlugin") {
+    fun log(msg: String) {
+        Log.d("ENDLESS-SERVICE", msg)
+    }
+
+    override fun onBind(intent: Intent): IBinder? {
+        log("Some component want to bind with the service")
+        // We don't provide binding, so return null
+        return null
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        log("onStartCommand executed with startId: $startId")
+        if (intent != null) {
+            val action = intent.action
+            log("using an intent with action $action")
+            when (action) {
+                Actions.START.name -> startService()
+                Actions.STOP.name -> stopService()
+                else -> log("This should never happen. No action in the received intent")
+            }
+        } else {
+            log(
+                    "with a null intent. It has been probably restarted by the system."
+            )
+        }
+        // by returning this we make sure the service is restarted if the system kills the service
+        return START_STICKY
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        log("The service has been created".toUpperCase())
+        var notification = createNotification()
+        startForeground(1, notification)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        log("The service has been destroyed".toUpperCase())
+        Toast.makeText(this, "Service destroyed", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun startService() {
+        if (serviceIsStarted) return
+        log("Starting the foreground service task")
+        log("4444")
+        Toast.makeText(myAppContext(), "Service starting its task", Toast.LENGTH_SHORT).show()
+        serviceIsStarted = true
+        log("2222")
+        setServiceState(myAppContext(), ServiceState.STARTED)
+        log("1111")
+
+        // we need this lock so our service gets not affected by Doze Mode
+
+        myWakeLock = (myAppContext().getSystemService(Context.POWER_SERVICE) as PowerManager)
+                .run {
+                    newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
+                        acquire()
+                    }
+                }
+
+
+    }
+
+    private fun stopService() {
+
+        log("Stopping the foreground service")
+        Toast.makeText(myAppContext(), "Service stopping", Toast.LENGTH_SHORT).show()
+        try {
+            myWakeLock?.let {
+                if (it.isHeld) {
+                    it.release()
+                }
+            }
+            stopForeground(true)
+            stopSelf()
+        } catch (e: Exception) {
+            log("Service stopped without being started: ${e.message}")
+        }
+        serviceIsStarted = false
+        setServiceState(myAppContext(), ServiceState.STOPPED)
+    }
+
+    private fun createNotification(): Notification {
+        val notificationChannelId = "ENDLESS SERVICE CHANNEL"
+
+        // depending on the Android API that we're dealing with we will have
+        // to use a specific method to create the notification
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager;
+            val channel = NotificationChannel(
+                    notificationChannelId,
+                    "Endless Service notifications channel",
+                    NotificationManager.IMPORTANCE_HIGH
+            ).let {
+                it.description = "Endless Service channel"
+
+                it
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val builder: Notification.Builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(
+                this,
+                notificationChannelId
+        ) else Notification.Builder(this)
+
+        return builder
+                .setContentTitle("Endless Service")
+                .setContentText("This is your favorite endless service working")
+                .setSmallIcon(R.mipmap.notification_icon)
+                .setTicker("Ticker text")
+                .build()
+    }
 
     companion object {
 
@@ -161,18 +273,21 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
                     //------------------------------
 
                     "startForegroundService" -> {
-                        launchService()
+//                        launchService()
+                        startService()
 
-                        val callbackHandle = (call.arguments as JSONArray).getLong(0)
-                        shouldWakeLock = (call.arguments as JSONArray).getBoolean(1)
-                        setupCallback(myAppContext(), callbackHandle)
+//                        val callbackHandle = (call.arguments as JSONArray).getLong(0)
+//                        shouldWakeLock = (call.arguments as JSONArray).getBoolean(1)
+//                        setupCallback(myAppContext(), callbackHandle)
                     }
 
                     "stopForegroundService" -> {
-                        notificationHelper.serviceIsForegrounded = false
-                        serviceIsStarted = false
-                        maybeReleaseWakeLock()
-                        stopSelf()
+                        stopService()
+
+//                        notificationHelper.serviceIsForegrounded = false
+//                        serviceIsStarted = false
+//                        maybeReleaseWakeLock()
+//                        stopSelf()
                     }
 
                     "foregroundServiceIsStarted" ->

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:foreground_service/foreground_service.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
   runApp(MyApp());
 
   maybeStartFGS();
