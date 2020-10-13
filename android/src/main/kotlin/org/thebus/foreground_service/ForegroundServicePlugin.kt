@@ -274,8 +274,17 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
 
                     "startForegroundService" -> {
 //                        launchService()
-                        startService()
 
+                        Intent(myAppContext(), ForegroundServicePlugin::class.java).also {
+                            it.action = Actions.START.name
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                log("Starting the service in >=26 Mode from a BroadcastReceiver")
+                                myAppContext().startForegroundService(it)
+                                return
+                            }
+                            log("Starting the service in < 26 Mode from a BroadcastReceiver")
+                            myAppContext().startService(it)
+                        }
 //                        val callbackHandle = (call.arguments as JSONArray).getLong(0)
 //                        shouldWakeLock = (call.arguments as JSONArray).getBoolean(1)
 //                        setupCallback(myAppContext(), callbackHandle)
