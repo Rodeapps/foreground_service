@@ -1,9 +1,6 @@
 package org.thebus.foreground_service
 
-import android.app.IntentService
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
+import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.os.*
@@ -57,8 +54,8 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
     override fun onCreate() {
         super.onCreate()
         log("The service has been created".toUpperCase())
-        var notification = createNotification()
-        startForeground(1, notification)
+//        var notification = createNotification()
+//        startForeground(1, notification)
     }
 
     override fun onDestroy() {
@@ -67,45 +64,66 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
         Toast.makeText(this, "Service destroyed", Toast.LENGTH_SHORT).show()
     }
 
+    override fun onTaskRemoved(rootIntent: Intent) {
+        val restartServiceIntent = Intent(applicationContext, ForegroundServicePlugin::class.java).also {
+            it.setPackage(packageName)
+        };
+        log("onTaskRemoved".toUpperCase())
+
+        val restartServicePendingIntent: PendingIntent = PendingIntent.getService(this, 1, restartServiceIntent, PendingIntent.FLAG_ONE_SHOT);
+        applicationContext.getSystemService(Context.ALARM_SERVICE);
+        val alarmService: AlarmManager = applicationContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager;
+        alarmService.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + 1000, restartServicePendingIntent);
+    }
+
     private fun startService() {
         if (serviceIsStarted) return
         log("Starting the foreground service task")
-        log("4444")
         Toast.makeText(myAppContext(), "Service starting its task", Toast.LENGTH_SHORT).show()
         serviceIsStarted = true
-        log("2222")
         setServiceState(myAppContext(), ServiceState.STARTED)
-        log("1111")
 
         // we need this lock so our service gets not affected by Doze Mode
-
         myWakeLock = (myAppContext().getSystemService(Context.POWER_SERVICE) as PowerManager)
                 .run {
                     newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
                         acquire()
                     }
                 }
-
-
+        tryStartForeground();
     }
 
     private fun stopService() {
-
         log("Stopping the foreground service")
         Toast.makeText(myAppContext(), "Service stopping", Toast.LENGTH_SHORT).show()
+//        notificationHelper.serviceIsForegrounded = false
+//        serviceIsStarted = false
+//        myWakeLock?.let {
+//            if (it.isHeld) {
+//                it.release()
+//            }
+//        }
+//        stopSelf()
+//        setServiceState(myAppContext(), ServiceState.STOPPED)
+
         try {
+            notificationHelper.serviceIsForegrounded = false
+            serviceIsStarted = false
             myWakeLock?.let {
                 if (it.isHeld) {
                     it.release()
                 }
             }
-            stopForeground(true)
+
+
             stopSelf()
+            myAppContext().stopService(Intent(myAppContext(), ForegroundServicePlugin::class.java))
+            setServiceState(myAppContext(), ServiceState.STOPPED)
+
         } catch (e: Exception) {
             log("Service stopped without being started: ${e.message}")
         }
-        serviceIsStarted = false
-        setServiceState(myAppContext(), ServiceState.STOPPED)
+
     }
 
     private fun createNotification(): Notification {
@@ -145,7 +163,6 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
         private const val LOG_TAG = "ForegroundServicePlugin"
         private const val WAKELOCK_TAG = "ForegroundServicePlugin::WakeLock"
 
-        private const val INTENT_ACTION_START_SERVICE = "Start Service"
         private const val INTENT_ACTION_LOOP = "Loop"
 
         private var myApplicationContextRef: SoftReference<Context>? = null
@@ -160,8 +177,6 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
                     ?: throw Exception("ForegroundServicePlugin application context was null")
         }
 
-        private var shouldWakeLock: Boolean = false
-        private var hasWakeLock: Boolean = false
         private lateinit var myWakeLock: PowerManager.WakeLock
 
         //put this in the companion object so doCallback can use it later
@@ -273,30 +288,16 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
                     //------------------------------
 
                     "startForegroundService" -> {
-//                        launchService()
+                        launchService()
 
-                        Intent(myAppContext(), ForegroundServicePlugin::class.java).also {
-                            it.action = Actions.START.name
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                log("Starting the service in >=26 Mode from a BroadcastReceiver")
-                                myAppContext().startForegroundService(it)
-                                return
-                            }
-                            log("Starting the service in < 26 Mode from a BroadcastReceiver")
-                            myAppContext().startService(it)
-                        }
-//                        val callbackHandle = (call.arguments as JSONArray).getLong(0)
-//                        shouldWakeLock = (call.arguments as JSONArray).getBoolean(1)
-//                        setupCallback(myAppContext(), callbackHandle)
+                        val callbackHandle = (call.arguments as JSONArray).getLong(0)
+                        setupCallback(myAppContext(), callbackHandle)
                     }
 
                     "stopForegroundService" -> {
+                        print("stopForegroundService");
                         stopService()
-
-//                        notificationHelper.serviceIsForegrounded = false
-//                        serviceIsStarted = false
-//                        maybeReleaseWakeLock()
-//                        stopSelf()
+                        notificationHelper.serviceIsForegrounded = false
                     }
 
                     "foregroundServiceIsStarted" ->
@@ -354,14 +355,6 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
 
                     //------------------------------
 
-                    "getWakeLock" -> {
-                        shouldWakeLock = true
-                        maybeGetWakeLock()
-                    }
-
-                    "releaseWakeLock" -> {
-                        maybeReleaseWakeLock()
-                    }
 
                     //------------------------------
 
@@ -474,12 +467,10 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
     //after the service is started, onHandleIntent does the foregrounding stuff
     private fun launchService() {
         try {
-
             val startServiceIntent = Intent(myAppContext(), ForegroundServicePlugin::class.java)
-            startServiceIntent.action = INTENT_ACTION_START_SERVICE
+            startServiceIntent.action = Actions.START.name
 
             if (thisCanReceiveIntent(startServiceIntent)) {
-
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     myAppContext().startForegroundService(startServiceIntent)
                 } else {
@@ -500,7 +491,6 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
 
     //this sets up a background isolate for executing flutter/dart code
     private fun setupCallback(callbackContext: Context, callbackHandle: Long) {
-
         FlutterMain.ensureInitializationComplete(callbackContext, null)
 
         if (!flutterEngine.dartExecutor.isExecutingDart) {
@@ -524,9 +514,11 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
     }
 
     override fun onHandleIntent(p0: Intent?) {
+        logDebug("onHandleIntent : ${p0}")
+
         try {
             when (p0?.action) {
-                INTENT_ACTION_START_SERVICE -> {
+                Actions.START.name -> {
                     logDebug("started service, making foreground")
 
                     if (tryStartForeground()) {
@@ -550,23 +542,17 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
     }
 
     private fun maybeGetWakeLock() {
-        if (shouldWakeLock && !hasWakeLock) {
+
+        if (myWakeLock == null) {
             myWakeLock = (myAppContext().getSystemService(Context.POWER_SERVICE) as PowerManager)
                     .run {
                         newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
                             acquire()
                         }
                     }
-            hasWakeLock = true
         }
     }
 
-    private fun maybeReleaseWakeLock() {
-        if (shouldWakeLock && hasWakeLock) {
-            myWakeLock.release()
-            hasWakeLock = false
-        }
-    }
 
     private fun tryStartForeground(): Boolean = (
             try {
@@ -584,6 +570,7 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
     //TODO: find a better way to do this...
     private fun serviceLoop() {
 //    logDebug("serviceLoop")
+        /*
         if (serviceIsStarted) {
             if ((dartServiceFunctionHandle != null) && isBackgroundIsolateSetupComplete) {
                 if (
@@ -601,11 +588,11 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
                 }
             }
 
-            val loopIntent = Intent(myAppContext(), ForegroundServicePlugin::class.java)
-            loopIntent.action = INTENT_ACTION_LOOP
+//            val loopIntent = Intent(myAppContext(), ForegroundServicePlugin::class.java)
+//            loopIntent.action = INTENT_ACTION_LOOP
 //      logDebug("serviceLoop: startService(loopIntent)")
-            myAppContext().startService(loopIntent)
-        }
+//            myAppContext().startService(loopIntent)
+        }*/
     }
 
     private fun thisCanReceiveIntent(serviceIntent: Intent): Boolean {
@@ -703,8 +690,18 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
         //so just hardcode the expected icon location
         private val hardcodedIconName = "org_thebus_foregroundserviceplugin_notificationicon"
 
+        private fun getHardcodedIconResourceId(): Int =
+                myAppContext().resources.getIdentifier(
+                        hardcodedIconName,
+                        "drawable",
+                        myAppContext().packageName
+                )
 
         private fun iconResourceIdIsValid(someResourceId: Int): Boolean = someResourceId != 0
+        fun hardcodedIconIsAvailable(): Boolean = iconResourceIdIsValid(getHardcodedIconResourceId())
+        val hardCodedIconNotFoundErrorMessage = "could not find /res/drawable/$hardcodedIconName;" +
+                " running a foreground service requires a notification," +
+                " and a notification requires an icon"
 
         //whew, this is ugly
         //basically all the init/default stuff is shoved in here
@@ -719,8 +716,8 @@ class ForegroundServicePlugin : FlutterPlugin, MethodCallHandler, IntentService(
                         .setContentTitle("Foreground Service")
                         .setContentText("Running")
                         .setOngoing(true)
-                        .setOnlyAlertOnce(true)
-                        .setSmallIcon(R.drawable.notification_icon)
+                        .setOnlyAlertOnce(false)
+                        .setSmallIcon(getHardcodedIconResourceId())
 
                 //the "normal" setPriority method will try to rebuild/renotify
                 //which of course isn't going to end well since the builder hasn't been set yet
@@ -896,4 +893,6 @@ enum class AndroidNotifiationPriority {
                 }
                 )
     }
+
+
 }

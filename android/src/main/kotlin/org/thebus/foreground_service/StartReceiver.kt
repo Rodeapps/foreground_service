@@ -15,12 +15,13 @@ class StartReceiver : BroadcastReceiver() {
         print("StartReceiver init");
 
     }
+
     override fun onReceive(context: Context, intent: Intent) {
         print("INTENT received on StartReceiver");
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-//                && getServiceState(context) == ServiceState.STARTED
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED && getServiceState(context) == ServiceState.STARTED) {
+
             Intent(context, ForegroundServicePlugin::class.java).also {
-//                it.action = Actions.START.name
+                it.action = Actions.START.name
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     print("Starting the service in >=26 Mode from a BroadcastReceiver")
                     context.startForegroundService(it)

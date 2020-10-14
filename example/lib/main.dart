@@ -28,7 +28,6 @@ void maybeStartFGS() async {
     await ForegroundService.notification.finishEditMode();
 
     await ForegroundService.startForegroundService(foregroundServiceFunction);
-    await ForegroundService.getWakeLock();
   }
 
   ///this exists solely in the main app/isolate,
