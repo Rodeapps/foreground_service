@@ -30,8 +30,8 @@ class ForegroundServicePlugin: FlutterPlugin, MethodCallHandler, IntentService("
     private const val LOG_TAG = "ForegroundServicePlugin"
     private const val WAKELOCK_TAG = "ForegroundServicePlugin::WakeLock"
 
-    private const val INTENT_ACTION_START_SERVICE = "Start Service"
-    private const val INTENT_ACTION_START_APP = "Open app"
+    const val INTENT_ACTION_START_SERVICE = "Start Service"
+    const val INTENT_ACTION_START_APP = "Open app"
 
     private const val INTENT_ACTION_LOOP = "Loop"
 
@@ -100,10 +100,10 @@ class ForegroundServicePlugin: FlutterPlugin, MethodCallHandler, IntentService("
       }
     }
 
-    private fun logDebug(debugMessage: String){
+    fun logDebug(debugMessage: String){
       Log.d(LOG_TAG, debugMessage)
     }
-    private fun logError(errorMessage: String){
+    fun logError(errorMessage: String){
       Log.e(LOG_TAG, errorMessage)
     }
     fun Result.simpleError(errorMessage: String?){
@@ -163,9 +163,14 @@ class ForegroundServicePlugin: FlutterPlugin, MethodCallHandler, IntentService("
               val callbackHandle = (call.arguments as JSONArray).getLong(0)
               shouldWakeLock = (call.arguments as JSONArray).getBoolean(1)
               setupCallback(myAppContext(), callbackHandle)
+
+              setServiceState(this, ServiceState.STARTED)
           }
 
           "stopForegroundService" -> {
+
+            setServiceState(this, ServiceState.STARTED)
+
             notificationHelper.serviceIsForegrounded = false
             serviceIsStarted = false
             maybeReleaseWakeLock()
@@ -509,7 +514,7 @@ class ForegroundServicePlugin: FlutterPlugin, MethodCallHandler, IntentService("
   class NotificationHelper(val notificationId: Int = 1){
 
     //things that MUST be set for a notification to function property (probably)
-    
+
     //setContentTitle
     //setContentText
     //setSmallIcon
