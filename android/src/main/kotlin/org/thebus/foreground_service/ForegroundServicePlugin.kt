@@ -169,7 +169,7 @@ class ForegroundServicePlugin: FlutterPlugin, MethodCallHandler, IntentService("
 
           "stopForegroundService" -> {
 
-            setServiceState(myAppContext(), ServiceState.STARTED)
+            setServiceState(myAppContext(), ServiceState.STOPPED)
 
             notificationHelper.serviceIsForegrounded = false
             serviceIsStarted = false
