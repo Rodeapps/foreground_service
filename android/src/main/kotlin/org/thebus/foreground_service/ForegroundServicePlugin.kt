@@ -164,12 +164,12 @@ class ForegroundServicePlugin: FlutterPlugin, MethodCallHandler, IntentService("
               shouldWakeLock = (call.arguments as JSONArray).getBoolean(1)
               setupCallback(myAppContext(), callbackHandle)
 
-              setServiceState(this, ServiceState.STARTED)
+              setServiceState(myAppContext(), ServiceState.STARTED)
           }
 
           "stopForegroundService" -> {
 
-            setServiceState(this, ServiceState.STARTED)
+            setServiceState(myAppContext(), ServiceState.STARTED)
 
             notificationHelper.serviceIsForegrounded = false
             serviceIsStarted = false
