@@ -13,7 +13,7 @@ import android.os.Build
 class BootBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
 
-        ForegroundServicePlugin.logDebug("received action" + intent.action)
+        ForegroundServicePlugin.logDebug("received action " + intent.action + " and service state is " + getServiceState(context))
 
         if (intent.action == Intent.ACTION_BOOT_COMPLETED && getServiceState(context) == ServiceState.STARTED) {
             try {
@@ -21,7 +21,13 @@ class BootBroadcastReceiver : BroadcastReceiver() {
                 startServiceIntent.action = ForegroundServicePlugin.INTENT_ACTION_START_SERVICE
                 //starting with O, have to startForegroundService instead of just startService
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    ForegroundServicePlugin.logDebug("received action & actually starting the service")
                     context.startForegroundService(startServiceIntent)
+
+                    ForegroundServicePlugin.logDebug("received action & actually starting the test service")
+                    val testStartServiceIntent = Intent(context, TestForegroundService::class.java)
+                    context.startForegroundService(testStartServiceIntent)
+
                 } else {
                     context.startService(startServiceIntent)
                 }

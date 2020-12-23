@@ -11,6 +11,11 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice|dataSync|location|mediaPlayback|mediaProjection|phoneCall" />
 
+        <service
+            android:name=".TestForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|dataSync|location|mediaPlayback|mediaProjection|phoneCall" />
+
         <receiver android:name=".BootBroadcastReceiver">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
