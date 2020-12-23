@@ -408,6 +408,13 @@ class ForegroundServicePlugin: FlutterPlugin, MethodCallHandler, IntentService("
       when(p0?.action){
         INTENT_ACTION_START_SERVICE -> {
           logDebug("started service, making foreground")
+          myApplicationContextRef = SoftReference(this)
+          isBackgroundIsolateSetupComplete = true
+
+          Handler(Looper.getMainLooper()).post{
+            callbackChannel =
+                    MethodChannel(flutterEngine.dartExecutor, "org.thebus.foreground_service/callback", JSONMethodCodec.INSTANCE)
+          }
 
           if(tryStartForeground()) {
             logDebug("started foreground notification, entering service loop")
