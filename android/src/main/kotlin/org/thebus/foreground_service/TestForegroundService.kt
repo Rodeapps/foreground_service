@@ -18,7 +18,6 @@ class TestForegroundService : IntentService("org.thebus.foreground_service.TestF
         startForeground(1, createNotification())
     }
 
-
     private fun createNotification(): Notification {
         val notificationChannelId = "ENDLESS SERVICE CHANNEL"
 
@@ -54,5 +53,5 @@ class TestForegroundService : IntentService("org.thebus.foreground_service.TestF
                 .setPriority(Notification.PRIORITY_HIGH) // for under android 26 compatibility
                 .build()
     }
-}
+
 }
